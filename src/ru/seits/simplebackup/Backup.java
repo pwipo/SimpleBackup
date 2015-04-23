@@ -1,7 +1,5 @@
 package ru.seits.simplebackup;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -18,7 +16,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.StringTokenizer;
 
 
 public class Backup {
@@ -34,7 +31,6 @@ public class Backup {
 	//static private final int intTypeDisk = 1;
 	//static private final int intTypeFlush = 2;
 	
-	static private final String strSplitterValue = ";;";
 	static private final String strPrefixFolder = "arch";
 
 	public static void main(String[] args) throws Exception {
@@ -93,14 +89,14 @@ public class Backup {
 		Collection<FileAttr> newFACollection = null;
 		File fileSettings = new File(strSettings);
 		if(!fileSettings.exists() || !(new File(strDestination, fileSource.getName())).exists()){
-			pw.println("create new inctance");
+			pw.println("create new archive " + strDestination + " for source " + strSource);
 			newFACollection = createNew(fileSource, new File(fileDestination, fileSource.getName()), fileSettings);
 		}else{
-			pw.println("update exist inctance");
+			pw.println("update exist archive " + strDestination + " for source " + strSource);
 			newFACollection = updateExist(fileSource, fileDestination, fileSettings, strFolder);
 		}
 
-		newFACollection.stream().forEach(t->System.out.println(printFileAttr(t)));
+		newFACollection.stream().forEach(t->System.out.println(Utils.exportFileAttr(t)));
 	}
 	
 	static private Collection<FileAttr> createNew(File fileSource, File fileDestination, File fileSettings) throws IOException {
@@ -120,27 +116,20 @@ public class Backup {
 		result = mapSettings.values();
 		return result;
 	}
-
+	
 	static private Collection<FileAttr> updateExist(File fileSource, File fileDestination, File fileSettings, String strFolderName) throws Exception{
 		Collection<FileAttr> result = null;
+		//long time = System.currentTimeMillis();
+		Map<String, FileAttr> mapSettings = Utils.getFileAttrsFromSettings(fileSettings);
+		if(mapSettings==null)
+			mapSettings = new HashMap<String, FileAttr>();
 		
-		//get fileattr from settings
-		Map<String, FileAttr> mapSettings = new HashMap<String, FileAttr>();
-		try(BufferedReader brSettings = new BufferedReader(new FileReader(fileSettings))){
-			String strLine = null;
-			while((strLine=brSettings.readLine())!=null){
-				FileAttr fa = buildFileAttr(strLine);
-				if(fa==null)
-					continue;
-				mapSettings.put(fa.getPath().substring(fa.getPath().indexOf(File.separator)+1), fa);
-			}
-		}/*catch(Exception e){
-			e.printStackTrace();
-			return;
-		}*/
 		//map.keySet().stream().forEach(t->System.out.println(t));
 		//map.values().stream().forEach(t->System.out.println(printFileAttr(t)));
 
+		//System.out.println("get fileattr from settings " + (System.currentTimeMillis() - time)/1000);
+		//time = System.currentTimeMillis();
+		
 		// update map of all settings fileattr - remove all not exist file in dest folder
 		Set<String> setSettingsTmp = new HashSet<String>();
 		for(File file: fileDestination.listFiles()){
@@ -159,12 +148,17 @@ public class Backup {
 				mapSettings2.put(entry.getKey(), entry.getValue());
 		}
 		mapSettings = mapSettings2;
+		//System.out.println("update map of all settings fileattr " + (System.currentTimeMillis() - time)/1000);
+		//time = System.currentTimeMillis();
 		
 		// get fileattr from source
 		Map<String, FileAttr> mapSourceSettings = getFileAttrsFromFolder(fileSource, false);
 		if(mapSourceSettings==null || mapSourceSettings.isEmpty())
 			return result;
 		
+		//System.out.println("get fileattr from source " + (System.currentTimeMillis() - time)/1000);
+		//time = System.currentTimeMillis();
+
 		//compare maps
 		Map<String, FileAttr> mapNewSettings = new HashMap<String, FileAttr>();
 		Map<String, FileAttr> mapNewSettingsNewFiles = new HashMap<String, FileAttr>();
@@ -215,6 +209,9 @@ public class Backup {
 			}
 		}
 		
+		//System.out.println("copy new files to archive " + (System.currentTimeMillis() - time)/1000);
+		//time = System.currentTimeMillis();
+
 		// write fileattr to file settings
 		writeToFileFileAtrrs(fileSettings, mapNewSettings);
 		
@@ -257,40 +254,6 @@ public class Backup {
 	    return result;
 	}
 	
-	
-	
-	static private String printFileAttr(FileAttr fa){
-		String result = null;
-		if(fa==null)
-			return result;
-		result = fa.getPath() + strSplitterValue + fa.getSize() + strSplitterValue + fa.getDateChang().getTime() + strSplitterValue + fa.getHash();
-		return result;
-	}
-	
-	static private FileAttr buildFileAttr(String str){
-		FileAttr result = null;
-		if(str==null)
-			return result;
-
-		StringTokenizer st = new StringTokenizer(str, strSplitterValue);
-		//System.out.println(str);
-		if(st.countTokens()<4)
-			return result;
-		FileAttr fa = new FileAttr();
-		fa.setPath(st.nextToken());
-		try{
-			fa.setSize(Long.parseLong(st.nextToken()));
-			fa.setDateChang(new Date(Long.parseLong(st.nextToken())));
-		}catch(Exception e){
-			//e.printStackTrace();
-			return result;
-		}
-		fa.setHash(st.nextToken());
-		result = fa;
-		
-		return result;
-	}
-
 	static private void writeToFileFileAtrrs(File file, Map<String, FileAttr> map) throws IOException{
 		if(file==null)
 			return;
@@ -300,7 +263,7 @@ public class Backup {
 		// write fileattr to file settings
 		try(PrintWriter pwSettings = new PrintWriter(new FileWriter(file))){
 			for(FileAttr fa: map.values())
-				pwSettings.println(printFileAttr(fa));
+				pwSettings.println(Utils.exportFileAttr(fa));
 		}/*catch(Exception e){
 			e.printStackTrace();
 			return;

@@ -1,7 +1,10 @@
 package ru.seits.simplebackup;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitResult;
@@ -10,8 +13,14 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.StringTokenizer;
 
 class Utils {
+
+	static private final String strSplitterValue = ";;";
 
 	static private int intCountByte = 1000;
 	static private String strAlgoritm = "MD5";
@@ -115,6 +124,58 @@ class Utils {
 		*/
 	    
 		return;
+	}
+	
+	static Map<String, FileAttr> getFileAttrsFromSettings(File fileSettings) throws FileNotFoundException, IOException {
+		Map<String, FileAttr> result = null;
+		//get fileattr from settings
+		Map<String, FileAttr> mapSettings = new HashMap<String, FileAttr>();
+		try(BufferedReader brSettings = new BufferedReader(new FileReader(fileSettings))){
+			String strLine = null;
+			while((strLine=brSettings.readLine())!=null){
+				FileAttr fa = importFileAttr(strLine);
+				if(fa==null)
+					continue;
+				mapSettings.put(fa.getPath().substring(fa.getPath().indexOf(File.separator)+1), fa);
+			}
+		}
+		
+		if(!mapSettings.isEmpty())
+			result = mapSettings;
+		
+		return result;
+	}
+
+	static private FileAttr importFileAttr(String str){
+		FileAttr result = null;
+		if(str==null)
+			return result;
+
+		StringTokenizer st = new StringTokenizer(str, strSplitterValue);
+		//System.out.println(str);
+		if(st.countTokens()<4)
+			return result;
+		FileAttr fa = new FileAttr();
+		fa.setPath(st.nextToken());
+		try{
+			fa.setSize(Long.parseLong(st.nextToken()));
+			fa.setDateChang(new Date(Long.parseLong(st.nextToken())));
+		}catch(Exception e){
+			//e.printStackTrace();
+			return result;
+		}
+		fa.setHash(st.nextToken());
+		result = fa;
+		
+		return result;
+	}
+
+	static String exportFileAttr(FileAttr fa){
+		String result = null;
+		if(fa==null)
+			return result;
+		result = fa.getPath() + strSplitterValue + fa.getSize() + strSplitterValue + fa.getDateChang().getTime() + strSplitterValue + fa.getHash();
+		return result;
 	}
 	
 	
