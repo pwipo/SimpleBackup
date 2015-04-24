@@ -148,7 +148,8 @@ class Utils {
 
 	static private FileAttr importFileAttr(String str){
 		FileAttr result = null;
-		if(str==null)
+		
+		if(str==null || str.trim().isEmpty())
 			return result;
 
 		StringTokenizer st = new StringTokenizer(str, strSplitterValue);
