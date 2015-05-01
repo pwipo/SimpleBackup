@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
@@ -136,36 +135,61 @@ class Utils {
 				FileAttr fa = importFileAttr(strLine);
 				if(fa==null)
 					continue;
-				mapSettings.put(fa.getPath().substring(fa.getPath().indexOf(File.separator)+1), fa);
+				// remove FileAttr if file hase removed (at this point!)
+				if(fa.getDateChang()==0 && fa.getSize()==-1 && fa.getHash().isEmpty()){
+					mapSettings.remove(fa.getPath());
+					continue;
+				}
+				
+				mapSettings.put(getStaticPath(fa), fa);
 			}
 		}
 		
-		if(!mapSettings.isEmpty())
-			result = mapSettings;
+		if(mapSettings.isEmpty())
+			return result;
+		
+		result = mapSettings;
 		
 		return result;
 	}
 
 	static private FileAttr importFileAttr(String str){
 		FileAttr result = null;
-		
+
+		//System.out.println(str);
 		if(str==null || str.trim().isEmpty())
 			return result;
 
 		StringTokenizer st = new StringTokenizer(str, strSplitterValue);
 		//System.out.println(str);
-		if(st.countTokens()<4)
+		int count = st.countTokens();
+		if(count<3)
 			return result;
+
+		boolean hasHash = true;
+		if(count<4)
+			hasHash = false;
+		
 		FileAttr fa = new FileAttr();
+		
 		fa.setPath(st.nextToken());
+		//System.out.println(fa.getPath());
+		if(fa.getPath()==null)
+			return result;
+		
 		try{
 			fa.setSize(Long.parseLong(st.nextToken()));
-			fa.setDateChang(new Date(Long.parseLong(st.nextToken())));
+			fa.setDateChang(Long.parseLong(st.nextToken()));
 		}catch(Exception e){
 			//e.printStackTrace();
 			return result;
 		}
-		fa.setHash(st.nextToken());
+		
+		if(hasHash)
+			fa.setHash(st.nextToken());
+		
+		//System.out.println(exportFileAttr(fa));
+
 		result = fa;
 		
 		return result;
@@ -175,10 +199,16 @@ class Utils {
 		String result = null;
 		if(fa==null)
 			return result;
-		result = fa.getPath() + strSplitterValue + fa.getSize() + strSplitterValue + fa.getDateChang().getTime() + strSplitterValue + fa.getHash();
+		result = fa.getPath() + strSplitterValue + fa.getSize() + strSplitterValue + fa.getDateChang() + strSplitterValue + fa.getHash();
 		return result;
 	}
 	
-	
+	static String getStaticPath(FileAttr fa){
+		String result = null;
+		if(fa==null || fa.getPath()==null)
+			return result;
+		result = fa.getPath().substring(fa.getPath().indexOf(File.separator)+1);
+		return result;
+	}
 	   
 }

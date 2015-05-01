@@ -16,7 +16,7 @@ public class Restore {
 	static private final int intArgsIdSettings = 2;
 	
 	public static void main(String[] args) throws FileNotFoundException, IOException {
-		//String[] args2 = {"d:\\1", "d:\\2", "d:\\1.txt", "tmp"};
+		//String[] args2 = {"d:\\2", "d:\\3", "d:\\1.txt"};
 		//String[] args2 = {"d:\\archive\\info", "d:\\archive2", "d:\\archive\\archInfo\\arch_info.txt"};
 		String[] args2 = args;
 		

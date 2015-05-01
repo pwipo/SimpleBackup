@@ -12,10 +12,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 
 public class Backup {
@@ -36,7 +34,7 @@ public class Backup {
 	//static private final boolean booleanCheckDestination = true;
 
 	public static void main(String[] args) throws Exception {
-		//String[] args2 = {/*Integer.toString(intTypeDisk), */"d:\\1", "d:\\2", "d:\\1.txt", "tmp"};
+		//String[] args2 = {"d:\\1", "d:\\2", "d:\\1.txt", "tmp"};
 		String[] args2 = args;
 		
 		PrintWriter pw = new PrintWriter(System.out, true);
@@ -99,7 +97,7 @@ public class Backup {
 		}
 		// write fileattr to file settings
 		//writeToFileFileAtrrs(fileSettings, mapNewSettings);
-		if(newFACollection==null)
+		if(newFACollection==null || newFACollection.isEmpty())
 			return;
 		
 		// write fileattr to file settings
@@ -131,61 +129,63 @@ public class Backup {
 	
 	static private Collection<FileAttr> updateExist(File fileSource, File fileDestination, File fileSettings, String strPrefixFolderName, boolean bCheckDest) throws Exception{
 		Collection<FileAttr> result = null;
-		//long time = System.currentTimeMillis();
+
+		// get fileattr from setting file
 		Map<String, FileAttr> mapSettings = Utils.getFileAttrsFromSettings(fileSettings);
 		if(mapSettings==null)
 			mapSettings = new HashMap<String, FileAttr>();
-		
-		//map.keySet().stream().forEach(t->System.out.println(t));
-		//map.values().stream().forEach(t->System.out.println(printFileAttr(t)));
 
-		//System.out.println("get fileattr from settings " + (System.currentTimeMillis() - time)/1000);
-		//time = System.currentTimeMillis();
-		
-		// update map of all settings fileattr - remove all not exist file in dest folder
-		if(bCheckDest){
-			Set<String> setSettingsTmp = new HashSet<String>();
-			for(File file: fileDestination.listFiles()){
-				Map<String, FileAttr> mapTmp = getFileAttrsFromFolder(file, false);
-				if(mapTmp==null || mapTmp.isEmpty())
-					continue;
-				for(String strKey: mapTmp.keySet()){
-					FileAttr fa = mapSettings.get(strKey);
-					if(fa!=null)
-						setSettingsTmp.add(strKey);
-				}
-			}
-			Map<String, FileAttr> mapSettings2 = new HashMap<String, FileAttr>();
-			for(Map.Entry<String, FileAttr> entry: mapSettings.entrySet()){
-				if(setSettingsTmp.contains(entry.getKey()))
-					mapSettings2.put(entry.getKey(), entry.getValue());
-			}
-			mapSettings = mapSettings2;
-		}
-		//System.out.println("update map of all settings fileattr " + (System.currentTimeMillis() - time)/1000);
-		//time = System.currentTimeMillis();
+		//System.out.println("values of mapSettings " + mapSettings.size());
+		//mapSettings.values().stream().forEach(t->System.out.println(Utils.exportFileAttr(t)));
 		
 		// get fileattr from source
 		Map<String, FileAttr> mapSourceSettings = getFileAttrsFromFolder(fileSource, false);
 		if(mapSourceSettings==null || mapSourceSettings.isEmpty())
 			return result;
 		
-		//System.out.println("get fileattr from source " + (System.currentTimeMillis() - time)/1000);
-		//time = System.currentTimeMillis();
+		//System.out.println("values of mapSourceSettings " + mapSettings.size());
+		//mapSourceSettings.values().stream().forEach(t->System.out.println(Utils.exportFileAttr(t)));
 
-		//compare maps
+		//create map of new and changes files
 		Map<String, FileAttr> mapNewSettingsNewFiles = new HashMap<String, FileAttr>();
 		for(Map.Entry<String, FileAttr> entry: mapSourceSettings.entrySet()){
 			FileAttr fa = mapSettings.get(entry.getKey());
-			if(fa==null || !fa.getDateChang().equals(entry.getValue().getDateChang()) || fa.getSize()!=entry.getValue().getSize()){
+			if(fa==null || fa.getDateChang() != entry.getValue().getDateChang() || fa.getSize()!=entry.getValue().getSize()){
 				mapNewSettingsNewFiles.put(entry.getKey(), entry.getValue());
+				//System.out.println(Utils.exportFileAttr(entry.getValue()) + " --- " + Utils.exportFileAttr(fa));
 				continue;
 			}
-			//mapNewSettings.put(entry.getKey(), fa);
+		}
+		// add to mapNewSettingsNewFiles files, if they not exist in destination
+		if(bCheckDest){
+			for(Map.Entry<String, FileAttr> entry: mapSettings.entrySet()){
+				if(mapNewSettingsNewFiles.containsKey(entry.getKey()))
+					continue;
+				
+				File fileTmpDest = new File(fileDestination.getAbsolutePath() + File.separator + entry.getValue().getPath());
+				if(fileTmpDest.exists())
+					continue;
+
+				FileAttr fa = getFileAttrFromFile(fileSource, entry.getKey(), true);
+				if(fa==null)
+					continue;
+
+				mapNewSettingsNewFiles.put(entry.getKey(), fa);
+			}
+		}
+		//System.out.println("values of mapNewSettingsNewFiles " + mapNewSettingsNewFiles.size());
+		//mapNewSettingsNewFiles.values().stream().forEach(t->System.out.println(Utils.exportFileAttr(t)));
+		
+		//create map of not exist files
+		List<String> listNewSettingsRemoveFiles = new ArrayList<String>();
+		for(Map.Entry<String, FileAttr> entry: mapSettings.entrySet()){
+			if(!mapSourceSettings.containsKey(entry.getKey())){
+				listNewSettingsRemoveFiles.add(entry.getKey());
+				continue;
+			}
 		}
 		
-		//Map<String, FileAttr> mapNewSettings = new HashMap<String, FileAttr>();
-		if(mapNewSettingsNewFiles.isEmpty())
+		if(mapNewSettingsNewFiles.isEmpty() && listNewSettingsRemoveFiles.isEmpty())
 			return result;
 		
 		// copy new files to archive
@@ -195,14 +195,15 @@ public class Backup {
 			return result;
 			
 		for(Map.Entry<String, FileAttr> entry: mapNewSettingsNewFiles.entrySet()){
-			String strPathAbsSrc = fileSource.getAbsolutePath() + File.separator +  entry.getKey();
-			String hash = Utils.buildHexStringFromByteArray(Utils.createChecksum(new File(strPathAbsSrc)));
-			if(hash==null)
+			// get fa
+			FileAttr fa = getFileAttrFromFile(fileSource, entry.getKey(), true);
+			if(fa==null)
 				continue;
+			fa.setPath(pathNewFolder.getFileName() + File.separator + entry.getKey());
 			
 			// if older file
 			FileAttr faTmp = mapSettings.get(entry.getKey());
-			if(faTmp!=null && faTmp.getHash().equals(hash)){
+			if(faTmp!=null && faTmp.getHash().equals(fa.getHash())){
 				//mapNewSettings.put(entry.getKey(), faTmp);
 				continue;
 			}
@@ -211,23 +212,24 @@ public class Backup {
 			File fileTmpNewDest = new File(pathNewFolder.toAbsolutePath().toString() + File.separator + entry.getKey());
 			if(!fileTmpNewSrc.exists())
 				continue;
+			
 			if(!fileTmpNewDest.getParentFile().exists())
 				fileTmpNewDest.getParentFile().mkdirs();
+			
 			try {
 				Files.copy(fileTmpNewSrc.toPath(), fileTmpNewDest.toPath());
 			} catch (IOException e) {
 				e.printStackTrace();
 				continue;
 			}
-			FileAttr fa = new FileAttr(pathNewFolder.getFileName() + File.separator + entry.getKey(), entry.getValue().getDateChang(), entry.getValue().getSize(), hash);
 			//System.out.println(printFileAttr(fa));
-			//mapNewSettings.put(entry.getKey(), fa);
 			lstTmp.add(fa);
 		}
 		
-		//System.out.println("copy new files to archive " + (System.currentTimeMillis() - time)/1000);
-		//time = System.currentTimeMillis();
-
+		// add removed fa to result list
+		for(String tmpStr: listNewSettingsRemoveFiles)
+			lstTmp.add(new FileAttr(tmpStr, 0, -1, ""));
+		
 		if(!lstTmp.isEmpty())
 			result = lstTmp;
 		return result;
@@ -246,14 +248,16 @@ public class Backup {
 			    public FileVisitResult visitFile(Path file,
 			    		BasicFileAttributes attrs) throws IOException {
 			    	String path = file.toAbsolutePath().toString().substring(folder.getAbsolutePath().length() + 1);
-			    	byte[] b = null;
+	    			//b = Utils.createChecksum(new File(file.toUri()));
+			    	FileAttr fa = null;
 			    	try {
-						b = Utils.createChecksum(new File(file.toUri()));
-					} catch (Exception e) {
-						return FileVisitResult.CONTINUE;
-					}
-			    	String hash = getHash ? Utils.buildHexStringFromByteArray(b) : null;
-			    	map.put(path, new FileAttr(folder.getName() + File.separator + path, new Date(attrs.lastModifiedTime().toMillis()), attrs.size(), hash));
+			    		fa = getFileAttrFromFile(folder, path, getHash);
+					} catch (Exception e) {}
+
+			    	if(fa!=null)
+						map.put(path, fa);
+			    	//map.put(path, new FileAttr(folder.getName() + File.separator + path, new Date(attrs.lastModifiedTime().toMillis()), attrs.size(), hash));
+			    	
 			        return FileVisitResult.CONTINUE;
 			    }
 			});
@@ -266,6 +270,26 @@ public class Backup {
 	    	result = map;
 
 	    return result;
+	}
+	
+	static private FileAttr getFileAttrFromFile(File fileSource, String path, boolean getHash) throws Exception{
+		FileAttr result = null;
+		
+		File fileTmp = new File(fileSource.getAbsolutePath() + File.separator + path);
+		if(!fileTmp.exists())
+			return result;
+		
+		String hash = null;
+		if(getHash){
+			hash = Utils.buildHexStringFromByteArray(Utils.createChecksum(fileTmp));
+			if(hash==null)
+				return result;
+		}
+
+		result = new FileAttr(fileSource.getName() + File.separator + path, fileTmp.lastModified(), fileTmp.length(), hash);
+		//System.out.println(Utils.exportFileAttr(result));
+		
+		return result;
 	}
 	
 	

@@ -1,21 +1,20 @@
 package ru.seits.simplebackup;
 
-import java.util.Date;
 
 class FileAttr {
 	private String path;
-	private Date dateChang;
+	private long dateChang;
 	private long size;
 	private String hash;
 	
 	public FileAttr() {
-		this.path = null;
-		this.dateChang = null;
+		this.path = "";
+		this.dateChang = 0;
 		this.size = -1;
-		this.hash = null;
+		this.hash = "";
 	}
 	
-	public FileAttr(String path, Date dateChang, long size, String hash) {
+	public FileAttr(String path, long dateChang, long size, String hash) {
 		this.path = path;
 		this.dateChang = dateChang;
 		this.size = size;
@@ -29,10 +28,10 @@ class FileAttr {
 		this.path = path;
 	}
 
-	public Date getDateChang() {
+	public long getDateChang() {
 		return dateChang;
 	}
-	public void setDateChang(Date dateChang) {
+	public void setDateChang(long dateChang) {
 		this.dateChang = dateChang;
 	}
 
