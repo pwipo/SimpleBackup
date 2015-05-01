@@ -242,29 +242,27 @@ public class Backup {
 			return result;
 		
 		Map<String, FileAttr> map = new HashMap<String, FileAttr>();
-	    //try {
-			Files.walkFileTree(folder.toPath(), new SimpleFileVisitor<Path>() {
-			    @Override
-			    public FileVisitResult visitFile(Path file,
-			    		BasicFileAttributes attrs) throws IOException {
-			    	String path = file.toAbsolutePath().toString().substring(folder.getAbsolutePath().length() + 1);
-	    			//b = Utils.createChecksum(new File(file.toUri()));
-			    	FileAttr fa = null;
-			    	try {
-			    		fa = getFileAttrFromFile(folder, path, getHash);
-					} catch (Exception e) {}
 
+		int intTmp = folder.getAbsolutePath().length() + 1;
+		Files.walkFileTree(folder.toPath(), new SimpleFileVisitor<Path>() {
+		    @Override
+		    public FileVisitResult visitFile(Path file,
+		    		BasicFileAttributes attrs) throws IOException {
+		    	String path = file.toAbsolutePath().toString().substring(intTmp);
+    			//b = Utils.createChecksum(new File(file.toUri()));
+		    	if(getHash){
+			    	FileAttr fa = null;
+		    		try {
+		    			fa = getFileAttrFromFile(folder, path, getHash);
+		    		} catch (Exception e) {}
 			    	if(fa!=null)
 						map.put(path, fa);
-			    	//map.put(path, new FileAttr(folder.getName() + File.separator + path, new Date(attrs.lastModifiedTime().toMillis()), attrs.size(), hash));
-			    	
-			        return FileVisitResult.CONTINUE;
-			    }
-			});
-		/*} catch (IOException e) {
-			e.printStackTrace();
-			return result;
-		}*/
+		    	}else{
+			    	map.put(path, new FileAttr(folder.getName() + File.separator + path, attrs.lastModifiedTime().toMillis(), attrs.size(), ""));
+		    	}
+		    	return FileVisitResult.CONTINUE;
+		    }
+		});
 	    
 	    if(!map.isEmpty())
 	    	result = map;
